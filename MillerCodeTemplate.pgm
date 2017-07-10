@@ -1,0 +1,329 @@
+;Mill rectangles and lines 
+;Ammar Aldaoud 
+;Last edited 25-08-16
+;
+;
+;
+;Description:
+;This program takes the coordinates of various rectangles and lines and is 
+;designed to mill them in diamond. The coordinates of each rectangle are
+;specified by the bottom left corner and top right corner. The lines are 
+;specified by starting and finishing coordinates. This is intended to make
+;it easy to use this code with Klayout.
+
+;Declaration of variables
+;***************************************************************************
+
+;Coordinates for each rectangle
+DVAR $rectangleBLX[99] ;Bottom left x coordinate
+DVAR $rectangleBLY[99] ;Bottom left y coordinate
+DVAR $rectangleTRX[99] ;top right x coordinate
+DVAR $rectangleTRY[99] ;top right y coordinate
+
+;Coordinates for each line
+DVAR $lineX1[99] ;x1 coordinate
+DVAR $lineX2[99] ;x2 coordinate
+DVAR $lineY1[99] ;y1 coordinate
+DVAR $lineY2[99] ;y2 coordinate
+
+;Variables for cutting a line
+DVAR $XENDline, $YENDline
+DVAR $SPEEDline, $PASSESline, $PASSCOUNTline
+DVAR $respline
+DVAR $POWERline, $PSODISTline
+DVAR $numberOfLines
+DVAR $lineCounter
+DVAR $tempX , $tempY
+
+;Variables for cutting a rectangle
+DVAR $XSTART , $YSTART , $ZSTART
+DVAR $SPEED , $STEPNO
+DVAR $SPIRALNO , $KERF
+DVAR $DISTX , $DISTY , $DISTZ , $STEP
+DVAR $ZSTEP , $PASSESrect , $PASSCOUNTrect
+DVAR $NUMBER , $NUMBERX , $NUMBERY , $NEWNUM
+DVAR $SPEEDrect
+DVAR $PSODIST
+DVAR $resp
+DVAR $POWERrect
+DVAR $PTIME
+DVAR $CT1, $CT2
+
+DVAR $numberOfRectangles
+DVAR $rectangleCounter
+
+;End declaration of variables
+;*****************************************************************************
+
+;Declaration of lines and rectangles
+;******************************************************************************
+
+;Specify the coordinates of each rectangle in mm here. If more than 99
+;rectangles are required, increase the 99s in the previous section
+$POWERrect = 10
+$PASSESrect = 1
+$STEP = .005
+$DISTZ=.01
+
+
+$POWERline=30
+$SPEEDline=.5
+$PASSESline=2
+
+
+$rectangleCounter = -1
+
+;appendRectangles
+
+;Specify the coordinates of each line in mm here. If more than 99
+;lines are required, increase the 99s in the previous section
+
+
+$lineCounter = 0
+
+;appendLines
+
+;Declaration of speed, power and passes
+;*****************************************************************************
+
+
+
+;End declaration of speed, power and passes
+;**************************************************************************
+
+;End declaration of lines and rectangles
+;********************************************************************************
+
+
+; Line cutting preamble
+;**************************************************************************
+
+PUSHMODES
+G91
+G71 
+MSGCLEAR -1
+
+SAFETYSHUTTER_CHECK
+INTERNAL_TRIG_FREQ_CHECK
+$PSODISTline=0.0005
+FARCALL "XYTRACKINGON.PGM" l$PSODISTline
+MSGCLEAR -1 
+
+
+;**************************************************************************
+
+REPEAT $numberOfLines
+
+; Line cutting code
+; *************************************************************************
+FARCALL "ATTENUATOR.PGM" s$POWERline i10
+
+BEAMOFF
+REPEAT $PASSESline
+
+G1 X$lineX1[$lineCounter] Y$lineY1[$lineCounter] F$SPEEDline
+BEAMON
+$tempX = $lineX2[$lineCounter]-$lineX1[$lineCounter]
+$tempY = $lineY2[$lineCounter]-$lineY1[$lineCounter]
+G1 X $tempX  Y $tempY F$SPEEDline
+BEAMOFF
+G1 X-$lineX1[$lineCounter] Y-$lineY1[$lineCounter] F$SPEEDline
+;Origin reset
+G1 X-$tempX Y-$tempY F$SPEEDline
+;GoBackToStart
+$lineCounter = $lineCounter + 1
+ENDREPEAT
+
+;MSGCLEAR -1
+;POPMODES
+;RETURN
+
+ENDREPEAT
+;Line cutting end
+;***************************************************************************
+
+REPEAT $numberOfRectangles
+;Rectangle milling preamble
+;**************************************************************************
+PUSHMODES
+BEAMOFF
+G91
+G71
+SAFETYSHUTTER_CHECK
+
+;End rectangle milling preamble
+;**************************************************************************
+
+
+;**************************************************************************
+;Rectangle milling code
+;Go to the rectangle
+$rectangleCounter = $rectangleCounter + 1
+G91 G1 X$rectangleBLX[$rectangleCounter] Y$rectangleBLY[$rectangleCounter]
+
+$XSTART = AXISSTATUS ( X , DATAITEM_ProgramPositionFeedback,1 ) ;CURRENT POSITION
+$YSTART = AXISSTATUS ( Y , DATAITEM_ProgramPositionFeedback,1 ) ;CURRENT POSITION
+$ZSTART = AXISSTATUS ( Z , DATAITEM_ProgramPositionFeedback,1 ) ;CURRENT POSITION
+
+$DISTX = $rectangleTRX[$rectangleCounter] - $rectangleBLX[$rectangleCounter]
+$DISTY = $rectangleTRY[$rectangleCounter] - $rectangleBLY[$rectangleCounter]
+$SPEEDrect = $DISTX
+
+G91 G1 X $DISTX/2 Y $DISTY/2
+
+
+$NUMBER = $DISTX / $STEP
+$CT1=0
+$CT2=0
+;***************************************************************************
+;***************************************************************************************
+
+$GLOBAL9 = TIMER(0)
+ 
+G91
+PUSHMODES
+
+FARCALL "ATTENUATOR.PGM" s$POWERrect i100
+
+F = $SPEEDrect
+
+$NEWNUM = $NUMBER / 2
+
+IF FRAC ( $NEWNUM ) == 0 THEN ;EVEN NUMBER OF LINES
+    MSGDISPLAY 1 , "EVEN NUMBER"
+    CALL EVENLINE
+ENDIF
+
+IF FRAC ( $NEWNUM ) NE 0 THEN ;ODD NUMBER OF LINES
+    MSGDISPLAY 1 , "ODD NUMBER"
+    $NEWNUM = INT ( $NEWNUM )
+    CALL ODDLINE
+ENDIF
+
+G90 G0 X$XSTART Y$YSTART Z$ZSTART
+
+G91
+
+$GLOBAL9 	= TIMER(0)-$GLOBAL9
+$PTIME		= $GLOBAL9*0.001
+MSGDISPLAY 2, "Process Time =  "$PTIME "  seconds" 
+BEAMOFF
+;G91 G1 X-$DISTX/2 Y-$DISTY/2
+G91 G1 X-$rectangleBLX[$rectangleCounter] Y-$rectangleBLY[$rectangleCounter]
+G91
+POPMODES
+G91
+POPMODES
+ENDREPEAT ;End rectangles
+ ;M2
+RETURN
+
+ ;**********************************************************
+ ;SUB ROUTINES FOR ODD OR EVEN NUMBER OF HATCH LINES
+ ;**********************************************************
+
+ ;**********************************************************
+ ;SUB ROUTINE FOR ODD NUMBER OF HATCH LINES
+ ;**********************************************************
+
+DFS ODDLINE
+    
+    G91 G0 X ( -$DISTX / 2 ) Y ( -$DISTY / 2 )
+    $PASSCOUNTrect = 0
+    
+    REPEAT $PASSESrect
+		        
+        REPEAT $NEWNUM
+			$CT1=$CT1+1		
+			
+			MSGCLEAR - 1
+			MSGDISPLAY 1, "CUTTING PASS NUMBER  " ( $PASSCOUNTrect ) , "    NUMBER OF PASSES LEFT =   " ( $PASSESrect - $PASSCOUNTrect )
+			MSGDISPLAY 1, "CUTTING HATCH NUMBER " $CT1 "   NUMBER OF PASSES LEFT =   " $NEWNUM-$CT1
+		
+            BEAMON
+            G1 Y$DISTY F$SPEEDrect
+            BEAMOFF
+            G1 X$STEP
+            BEAMON
+            G1 Y - $DISTY
+            BEAMOFF
+            G1 X$STEP
+        ENDREPEAT
+        
+        BEAMON
+        G1 Y$DISTY
+        G1 Y - $DISTY
+        
+        
+        REPEAT $NEWNUM
+            BEAMOFF
+            G1 X - $STEP
+            BEAMON
+            G1 Y$DISTY
+            BEAMOFF
+            G1 X - $STEP
+            BEAMON
+            G1 Y - $DISTY
+            BEAMOFF
+        ENDREPEAT
+        
+         ;G1 Z$DISTZ
+        $PASSCOUNTrect = $PASSCOUNTrect + 1
+        MSGCLEAR 1
+        
+    ENDREPEAT
+    
+    
+ENDDFS
+
+
+ ;**********************************************************
+ ;SUB ROUTINE FOR EVEN NUMBER OF HATCH LINES
+ ;**********************************************************
+
+DFS EVENLINE
+    $PASSCOUNTrect = 0
+    G91 G1 X ( -$DISTX / 2 ) Y ( -$DISTY / 2 )
+    
+    REPEAT $PASSESrect
+        
+        REPEAT $NEWNUM
+			$CT1=$CT1+1		
+		    
+			MSGCLEAR - 1
+			MSGDISPLAY 1, "CUTTING PASS NUMBER  " ( $PASSCOUNTrect ) , "    NUMBER OF PASSES LEFT =   " ( $PASSESrect - $PASSCOUNTrect )
+			MSGDISPLAY 1, "CUTTING HATCH NUMBER " $CT1 "   NUMBER OF PASSES LEFT =   " $NEWNUM-$CT1
+ 
+			BEAMON
+            G1 Y$DISTY
+            BEAMOFF
+            G1 X$STEP
+            BEAMON
+            G1 Y - $DISTY
+            BEAMOFF
+            G1 X$STEP
+        ENDREPEAT
+        
+        G1 X - $STEP
+        
+        REPEAT $NEWNUM
+            BEAMON
+            G1 Y$DISTY
+            BEAMOFF
+            G1 X - $STEP
+            BEAMON
+            G1 Y - $DISTY
+            BEAMOFF
+            G1 X - $STEP
+        ENDREPEAT
+        
+        G1 X$STEP
+         ;G1 Z$DISTZ
+        $PASSCOUNTrect = $PASSCOUNTrect + 1
+        MSGCLEAR 1
+        
+    ENDREPEAT
+    
+ENDDFS
+
+
