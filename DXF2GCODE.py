@@ -2,7 +2,7 @@
 """
 Created on Sun Sep 18 11:32:02 2016
 
-@author: ammar
+@author: Ammar Aldaoud
 """
 j = 1
 skipCount = 0
@@ -69,7 +69,7 @@ numberOfRectanglesString = "$numberOfRectangles="+str(numberOfRectangles)+"\n"
 numberOfLinesString = "$numberOfLines="+str(numberOfLines)+"\n"
   
 
-"Directory to MillerCodeTemplate placed here:"
+#####"Directory to MillerCodeTemplate placed here:"#####
 with open("/PLACE_DIRECTORY_TO_MILLER_CODE_HERE/MillerCodeTemplate.pgm") as g:
     contentTemplate = g.readlines()
 
@@ -85,10 +85,11 @@ for i in range(0, len(contentTemplate)):
         
 GCodeFileName = input("Enter a name for the G-Code file:")
 
-f = open("/home/ammar/Desktop/PythonLearning/"+GCodeFileName+".pgm","w") #opens file with name of "test.txt"
+#####"Directory to save G-Code placed here:"#####
+f = open("/PLACE_DIRECTORY_TO_SAVE_G_CODE_HERE/"+GCodeFileName+".pgm","w") 
 
 for item in contentTemplate:
   f.write("%s" % item)
 f.close()
 
-print("File "+GCodeFileName+".pgm sucessfully created in PythonLearning folder.")
+print("File "+GCodeFileName+".pgm sucessfully created.")
